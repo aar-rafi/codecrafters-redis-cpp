@@ -66,22 +66,28 @@ int main(int argc, char **argv)
   std::cout << "Client connected\n";
 
   char buffer[256];
-  bzero(buffer, 256);
-  int n = read(newsockfd, buffer, 255);
-  if (n < 0)
+  while (1)
   {
-    std::cerr << "Failed to read from socket\n";
-  }
-  std::cout << "Received message: " << buffer << "\n";
-  if (strcmp(buffer, "*1\r\n$4\r\nPING\r\n") == 0)
-  {
-    std::string response = "+PONG\r\n";
-    n = write(newsockfd, response.c_str(), response.length());
+    bzero(buffer, 256);
+    int n = read(newsockfd, buffer, 255);
     if (n < 0)
     {
-      std::cerr << "Failed to write to socket\n";
+      std::cerr << "Failed to read from socket\n";
+      break;
     }
-    std::cout << "Sent response: " << response;
+    std::cout << "Received message: " << buffer << "\n";
+
+    if (strcmp(buffer, "*1\r\n$4\r\nPING\r\n") == 0)
+    {
+      std::string response = "+PONG\r\n";
+      n = write(newsockfd, response.c_str(), response.length());
+      if (n < 0)
+      {
+        std::cerr << "Failed to write to socket\n";
+        break;
+      }
+      std::cout << "Sent response: " << response;
+    }
   }
 
   close(server_fd);
