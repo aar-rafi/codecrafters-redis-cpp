@@ -58,8 +58,31 @@ int main(int argc, char **argv)
 
   std::cout << "Waiting for a client to connect...\n";
 
-  accept(server_fd, (struct sockaddr *)&client_addr, (socklen_t *)&client_addr_len);
+  int newsockfd = accept(server_fd, (struct sockaddr *)&client_addr, (socklen_t *)&client_addr_len);
+  if (newsockfd < 0)
+  {
+    std::cerr << "Failed to accept client connection\n";
+  }
   std::cout << "Client connected\n";
+
+  char buffer[256];
+  bzero(buffer, 256);
+  int n = read(newsockfd, buffer, 255);
+  if (n < 0)
+  {
+    std::cerr << "Failed to read from socket\n";
+  }
+  std::cout << "Received message: " << buffer << "\n";
+  if (strcmp(buffer, "*1\r\n$4\r\nPING\r\n") == 0)
+  {
+    std::string response = "+PONG\r\n";
+    n = write(newsockfd, response.c_str(), response.length());
+    if (n < 0)
+    {
+      std::cerr << "Failed to write to socket\n";
+    }
+    std::cout << "Sent response: " << response;
+  }
 
   close(server_fd);
 
