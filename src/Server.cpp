@@ -247,8 +247,8 @@ static bool try_flush_buffer(Conn *conn)
   //   if (strcmp(read_buffer, "*1\r\n$4\r\nPING\r\n") == 0)
   //   {
   std::string response = "+PONG\r\n";
-  // int n = write(conn->fd, response.c_str(), response.length());
-  int n = write(conn->fd, &conn->wbuf[0], conn->wbuf_size);
+  int n = write(conn->fd, response.c_str(), response.length());
+  // int n = write(conn->fd, &conn->wbuf[0], conn->wbuf_size);
   if (n < 0)
   {
     std::cerr << "Failed to write to socket\n";
