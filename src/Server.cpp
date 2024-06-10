@@ -95,28 +95,28 @@ static void state_req(Conn *conn);
 
 static bool try_one_request(Conn *conn)
 {
-  // try to parse a request from the buffer
-  if (conn->rbuf_size < 4)
-  {
-    // not enough data in the buffer. Will retry in the next iteration
-    return false;
-  }
-  uint32_t len = 0;
-  memcpy(&len, &conn->rbuf[0], 4);
-  if (len > k_max_msg)
-  {
-    std::cerr << "too long\n";
-    conn->state = STATE_END;
-    return false;
-  }
-  if (4 + len > conn->rbuf_size)
-  {
-    // not enough data in the buffer. Will retry in the next iteration
-    return false;
-  }
+  // // try to parse a request from the buffer
+  // if (conn->rbuf_size < 4)
+  // {
+  //   // not enough data in the buffer. Will retry in the next iteration
+  //   return false;
+  // }
+  // uint32_t len = 0;
+  // memcpy(&len, &conn->rbuf[0], 4);
+  // if (len > k_max_msg)
+  // {
+  //   std::cerr << "too long\n";
+  //   conn->state = STATE_END;
+  //   return false;
+  // }
+  // if (4 + len > conn->rbuf_size)
+  // {
+  //   // not enough data in the buffer. Will retry in the next iteration
+  //   return false;
+  // }
 
-  // got one request, do something with it
-  printf("client says: %.*s\n", len, &conn->rbuf[4]);
+  // // got one request, do something with it
+  // printf("client says: %.*s\n", len, &conn->rbuf[4]);
 
   // generating echoing response
   // memcpy(&conn->wbuf[0], &len, 4);
@@ -130,12 +130,12 @@ static bool try_one_request(Conn *conn)
   // remove the request from the buffer.
   // note: frequent memmove is inefficient.
   // note: need better handling for production code.
-  size_t remain = conn->rbuf_size - 4 - len;
-  if (remain)
-  {
-    memmove(conn->rbuf, &conn->rbuf[4 + len], remain);
-  }
-  conn->rbuf_size = remain;
+  // size_t remain = conn->rbuf_size - 4 - len;
+  // if (remain)
+  // {
+  //   memmove(conn->rbuf, &conn->rbuf[4 + len], remain);
+  // }
+  // conn->rbuf_size = remain;
 
   // change state
   conn->state = STATE_RES;
@@ -147,42 +147,52 @@ static bool try_one_request(Conn *conn)
 
 static bool try_fill_buffer(Conn *conn)
 {
-  // try to fill the buffer
-  assert(conn->rbuf_size < sizeof(conn->rbuf));
-  ssize_t rv = 0;
-  do
-  {
-    size_t cap = sizeof(conn->rbuf) - conn->rbuf_size;
-    rv = read(conn->fd, &conn->rbuf[conn->rbuf_size], cap);
-  } while (rv < 0 && errno == EINTR);
+  // // try to fill the buffer
+  // assert(conn->rbuf_size < sizeof(conn->rbuf));
+  // ssize_t rv = 0;
+  // do
+  // {
+  //   size_t cap = sizeof(conn->rbuf) - conn->rbuf_size;
+  //   rv = read(conn->fd, &conn->rbuf[conn->rbuf_size], cap);
+  // } while (rv < 0 && errno == EINTR);
 
-  if (rv < 0 && errno == EAGAIN)
+  // if (rv < 0 && errno == EAGAIN)
+  // {
+  //   // got EAGAIN, stop.
+  //   return false;
+  // }
+  // if (rv < 0)
+  // {
+  //   std::cerr << "read() error";
+  //   conn->state = STATE_END;
+  //   return false;
+  // }
+  // if (rv == 0)
+  // {
+  //   if (conn->rbuf_size > 0)
+  //   {
+  //     std::cerr << "unexpected EOF";
+  //   }
+  //   else
+  //   {
+  //     std::cerr << "EOF";
+  //   }
+  //   conn->state = STATE_END;
+  //   return false;
+  // }
+
+  // conn->rbuf_size += (size_t)rv;
+  // assert(conn->rbuf_size <= sizeof(conn->rbuf));
+
+  memset(&conn->rbuf[0], 0, 256);
+  int n = read(conn->fd, &conn->rbuf[0], 255);
+  if (n < 0)
   {
-    // got EAGAIN, stop.
-    return false;
-  }
-  if (rv < 0)
-  {
-    std::cerr << "read() error";
+    std::cerr << "Failed to read from socket\n";
     conn->state = STATE_END;
     return false;
   }
-  if (rv == 0)
-  {
-    if (conn->rbuf_size > 0)
-    {
-      std::cerr << "unexpected EOF";
-    }
-    else
-    {
-      std::cerr << "EOF";
-    }
-    conn->state = STATE_END;
-    return false;
-  }
-
-  conn->rbuf_size += (size_t)rv;
-  assert(conn->rbuf_size <= sizeof(conn->rbuf));
+  std::cout << "Received message: " << &conn->rbuf[0] << "\n";
 
   // Try to process requests one by one.
   // Why is there a loop? Please read the explanation of "pipelining".
@@ -201,37 +211,56 @@ static void state_req(Conn *conn)
 
 static bool try_flush_buffer(Conn *conn)
 {
-  ssize_t rv = 0;
-  do
+  //   ssize_t rv = 0;
+  //   do
+  //   {
+  //     size_t remain = conn->wbuf_size - conn->wbuf_sent;
+  //     std::cout << "remain: " << conn->wbuf_size << "\n";
+  //     rv = write(conn->fd, &conn->wbuf[conn->wbuf_sent], remain);
+  //     // rv = write(conn->fd, res.c_str(), res.length());
+  //   } while (rv < 0 && errno == EINTR);
+  //   if (rv < 0 && errno == EAGAIN)
+  //   {
+  //     // got EAGAIN, stop.
+  //     return false;
+  //   }
+  //   if (rv < 0)
+  //   {
+  //     std::cerr << "write() error";
+  //     conn->state = STATE_END;
+  //     return false;
+  //   }
+  //   conn->wbuf_sent += (size_t)rv;
+  //   assert(conn->wbuf_sent <= conn->wbuf_size);
+  //   if (conn->wbuf_sent == conn->wbuf_size)
+  //   {
+  //     // response was fully sent, change state back
+  //     conn->state = STATE_REQ;
+  //     conn->wbuf_sent = 0;
+  //     conn->wbuf_size = 0;
+  //     return false;
+  //   }
+  //   // still got some data in wbuf, could try to write again
+  // return true;
+  //
+  // std::string read_buffer = &conn->rbuf;
+  //   if (strcmp(read_buffer, "*1\r\n$4\r\nPING\r\n") == 0)
+  //   {
+  std::string response = "+PONG\r\n";
+  // int n = write(conn->fd, response.c_str(), response.length());
+  int n = write(conn->fd, &conn->wbuf[0], conn->wbuf_size);
+  if (n < 0)
   {
-    size_t remain = conn->wbuf_size - conn->wbuf_sent;
-    std::cout << "remain: " << conn->wbuf_size << "\n";
-    rv = write(conn->fd, &conn->wbuf[conn->wbuf_sent], remain);
-    // rv = write(conn->fd, res.c_str(), res.length());
-  } while (rv < 0 && errno == EINTR);
-  if (rv < 0 && errno == EAGAIN)
-  {
-    // got EAGAIN, stop.
-    return false;
-  }
-  if (rv < 0)
-  {
-    std::cerr << "write() error";
+    std::cerr << "Failed to write to socket\n";
     conn->state = STATE_END;
     return false;
   }
-  conn->wbuf_sent += (size_t)rv;
-  assert(conn->wbuf_sent <= conn->wbuf_size);
-  if (conn->wbuf_sent == conn->wbuf_size)
-  {
-    // response was fully sent, change state back
-    conn->state = STATE_REQ;
-    conn->wbuf_sent = 0;
-    conn->wbuf_size = 0;
-    return false;
-  }
-  // still got some data in wbuf, could try to write again
-  return true;
+  std::cout << "Sent response: " << response;
+  conn->state = STATE_REQ;
+  conn->wbuf_sent = 0;
+  conn->wbuf_size = 0;
+  return false;
+  // }
 }
 
 static void state_res(Conn *conn)
