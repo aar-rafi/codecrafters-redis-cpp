@@ -90,6 +90,9 @@ static int accept_new_conn(int _server_fd, std::vector<Conn *> &fd2conn)
   return 0;
 }
 
+static void state_res(Conn *conn);
+static void state_req(Conn *conn);
+
 static bool try_one_request(Conn *conn)
 {
   // try to parse a request from the buffer
