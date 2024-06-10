@@ -205,7 +205,7 @@ static bool try_flush_buffer(Conn *conn)
   do
   {
     size_t remain = conn->wbuf_size - conn->wbuf_sent;
-    // std::string res="+PONG\r\n";
+    std::cout << "remain: " << conn->wbuf_size << "\n";
     rv = write(conn->fd, &conn->wbuf[conn->wbuf_sent], remain);
     // rv = write(conn->fd, res.c_str(), res.length());
   } while (rv < 0 && errno == EINTR);
