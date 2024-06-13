@@ -12,32 +12,52 @@
 #include <vector>
 #include <assert.h>
 #include <thread>
+#include "RESPparser.hpp"
+
+const int buff_size = 2048;
 
 void handle_client(int newsockfd)
 {
-  char buffer[256];
+  char buffer[buff_size];
   while (1)
   {
-    memset(buffer, 0, 256);
-    int n = read(newsockfd, buffer, 255);
+    // memset(buffer, 0, 256);
+    int n = read(newsockfd, buffer, buff_size - 1);
     if (n < 0)
     {
       std::cerr << "Failed to read from socket\n";
-      break;
+      return;
+    }
+    if (n == 0)
+    {
+      std::cout << "Connection closed\n";
+      return;
     }
     std::cout << "Received message: " << buffer << "\n";
 
-    if (strcmp(buffer, "*1\r\n$4\r\nPING\r\n") == 0)
+    RESP resp = parseResp(string(buffer));
+    string command = resp.msgs[0];
+    // uppercase command
+    for (int i = 0; i < command.length(); i++)
     {
-      std::string response = "+PONG\r\n";
-      n = write(newsockfd, response.c_str(), response.length());
-      if (n < 0)
-      {
-        std::cerr << "Failed to write to socket\n";
-        break;
-      }
-      std::cout << "Sent response: " << response;
+      command[i] = toupper(command[i]);
     }
+    std::string response;
+    if (command == "ECHO")
+    {
+      response = "$" + std::to_string(resp.msgs[1].length()) + "\r\n" + resp.msgs[1] + "\r\n";
+    }
+    else
+    {
+      response = "+PONG\r\n";
+    }
+    n = write(newsockfd, response.c_str(), response.length());
+    if (n < 0)
+    {
+      std::cerr << "Failed to write to socket\n";
+      break;
+    }
+    std::cout << "Sent response: " << response;
   }
 }
 
