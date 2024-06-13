@@ -13,8 +13,10 @@
 #include <assert.h>
 #include <thread>
 #include "RESPparser.hpp"
+#include <unordered_map>
 
 const int buff_size = 2048;
+unordered_map<string, string> db;
 
 void handle_client(int newsockfd)
 {
@@ -35,8 +37,8 @@ void handle_client(int newsockfd)
     }
     std::cout << "Received message: " << buffer << "\n";
 
-    RESP resp = parseResp(string(buffer));
-    string command = resp.msgs[0];
+    RESP parsed_msg = parseResp(string(buffer));
+    string command = parsed_msg.msgs[0];
     // uppercase command
     for (int i = 0; i < command.length(); i++)
     {
@@ -45,7 +47,24 @@ void handle_client(int newsockfd)
     std::string response;
     if (command == "ECHO")
     {
-      response = "$" + std::to_string(resp.msgs[1].length()) + "\r\n" + resp.msgs[1] + "\r\n";
+      response = "$" + std::to_string(parsed_msg.msgs[1].length()) + "\r\n" + parsed_msg.msgs[1] + "\r\n";
+    }
+    else if (command == "SET")
+    {
+      db[parsed_msg.msgs[1]] = parsed_msg.msgs[2];
+      response = "+OK\r\n";
+    }
+    else if (command == "GET")
+    {
+      if (db.find(parsed_msg.msgs[1]) != db.end())
+      {
+        string s = db[parsed_msg.msgs[1]];
+        response = "$" + std::to_string(s.length()) + "\r\n" + s + "\r\n";
+      }
+      else
+      {
+        response = "$-1\r\n";
+      }
     }
     else
     {
