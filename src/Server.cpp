@@ -81,6 +81,11 @@ void handle_client(int newsockfd)
         response = "$" + to_string(s.length()) + "\r\n" + s + "\r\n";
       }
     }
+    else if (command == "INFO")
+    {
+      // if(parsed_msg.msgs[1]=="replication")
+      response = "$11\r\nrole:master\r\n";
+    }
     else
     {
       response = "+PONG\r\n";
