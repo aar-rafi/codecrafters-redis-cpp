@@ -15,8 +15,11 @@
 #include "RESPparser.hpp"
 #include <unordered_map>
 
+using namespace std;
+
 const int buff_size = 2048;
 unordered_map<string, string> db;
+unordered_map<string, chrono::time_point<chrono::system_clock, chrono::milliseconds>> db_ttl;
 
 void handle_client(int newsockfd)
 {
@@ -27,15 +30,15 @@ void handle_client(int newsockfd)
     int n = read(newsockfd, buffer, buff_size - 1);
     if (n < 0)
     {
-      std::cerr << "Failed to read from socket\n";
+      cerr << "Failed to read from socket\n";
       return;
     }
     if (n == 0)
     {
-      std::cout << "Connection closed\n";
+      cout << "Connection closed\n";
       return;
     }
-    std::cout << "Received message: " << buffer << "\n";
+    cout << "Received message: " << buffer << "\n";
 
     RESP parsed_msg = parseResp(string(buffer));
     string command = parsed_msg.msgs[0];
@@ -44,26 +47,38 @@ void handle_client(int newsockfd)
     {
       command[i] = toupper(command[i]);
     }
-    std::string response;
+    string response;
     if (command == "ECHO")
     {
-      response = "$" + std::to_string(parsed_msg.msgs[1].length()) + "\r\n" + parsed_msg.msgs[1] + "\r\n";
+      response = "$" + to_string(parsed_msg.msgs[1].length()) + "\r\n" + parsed_msg.msgs[1] + "\r\n";
     }
     else if (command == "SET")
     {
       db[parsed_msg.msgs[1]] = parsed_msg.msgs[2];
+      if (parsed_msg.msgs.size() == 5)
+      {
+        int ttl = stoi(parsed_msg.msgs[4]);
+        db_ttl[parsed_msg.msgs[1]] = chrono::time_point_cast<chrono::milliseconds>(chrono::system_clock::now()) + chrono::milliseconds(ttl);
+      }
       response = "+OK\r\n";
     }
     else if (command == "GET")
     {
-      if (db.find(parsed_msg.msgs[1]) != db.end())
+      string key = parsed_msg.msgs[1];
+      if (db.find(key) == db.end())
       {
-        string s = db[parsed_msg.msgs[1]];
-        response = "$" + std::to_string(s.length()) + "\r\n" + s + "\r\n";
+        response = "$-1\r\n";
+      }
+      else if (db_ttl.find(key) != db_ttl.end() && db_ttl[key] < chrono::time_point_cast<chrono::milliseconds>(chrono::system_clock::now()))
+      {
+        response = "$-1\r\n";
+        db.erase(key);
+        db_ttl.erase(key);
       }
       else
       {
-        response = "$-1\r\n";
+        string s = db[key];
+        response = "$" + to_string(s.length()) + "\r\n" + s + "\r\n";
       }
     }
     else
@@ -73,26 +88,26 @@ void handle_client(int newsockfd)
     n = write(newsockfd, response.c_str(), response.length());
     if (n < 0)
     {
-      std::cerr << "Failed to write to socket\n";
+      cerr << "Failed to write to socket\n";
       break;
     }
-    std::cout << "Sent response: " << response;
+    cout << "Sent response: " << response;
   }
 }
 
 int main(int argc, char **argv)
 {
-  // Flush after every std::cout / std::cerr
-  std::cout << std::unitbuf;
-  std::cerr << std::unitbuf;
+  // Flush after every cout / cerr
+  cout << unitbuf;
+  cerr << unitbuf;
 
   // You can use print statements as follows for debugging, they'll be visible when running tests.
-  std::cout << "Logs from your program will appear here!\n";
+  cout << "Logs from your program will appear here!\n";
 
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0)
   {
-    std::cerr << "Failed to create server socket\n";
+    cerr << "Failed to create server socket\n";
     return 1;
   }
 
@@ -101,7 +116,7 @@ int main(int argc, char **argv)
   int reuse = 1;
   if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
   {
-    std::cerr << "setsockopt failed\n";
+    cerr << "setsockopt failed\n";
     return 1;
   }
 
@@ -112,14 +127,14 @@ int main(int argc, char **argv)
 
   if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) != 0)
   {
-    std::cerr << "Failed to bind to port 6379\n";
+    cerr << "Failed to bind to port 6379\n";
     return 1;
   }
 
   int connection_backlog = 5; // queue for incoming connections
   if (listen(server_fd, connection_backlog) != 0)
   {
-    std::cerr << "listen failed\n";
+    cerr << "listen failed\n";
     return 1;
   }
 
@@ -129,8 +144,8 @@ int main(int argc, char **argv)
   while (true)
   {
     int newsockfd = accept(server_fd, (struct sockaddr *)&client_addr, (socklen_t *)&client_addr_len);
-    std::cout << "Accepted connection\n";
-    std::thread thrd(handle_client, newsockfd);
+    cout << "Accepted connection\n";
+    thread thrd(handle_client, newsockfd);
     thrd.detach();
   }
 
