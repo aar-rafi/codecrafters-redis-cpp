@@ -85,7 +85,8 @@ void handle_client(int newsockfd)
     else if (command == "INFO")
     {
       // if(parsed_msg.msgs[1]=="replication")
-      response = "$" + to_string(role.length() + 5) + "\r\nrole:" + role + "\r\n";
+      string s = "$" + to_string(role.length() + 5 + 54 + 20 + 4) + "\r\nrole:" + role + "\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0\r\n";
+      response = s;
     }
     else
     {
@@ -111,7 +112,8 @@ int main(int argc, char **argv)
       if (i + 1 > argc)
       {
         cerr << "Port number not provided\n";
-        return 1;
+        // return 1;
+        break;
       }
       port = atoi(argv[i + 1]);
       for (i = i + 1; i < argc; i++)
