@@ -20,6 +20,7 @@ using namespace std;
 const int buff_size = 2048;
 unordered_map<string, string> db;
 unordered_map<string, chrono::time_point<chrono::system_clock, chrono::milliseconds>> db_ttl;
+string role = "master";
 
 void handle_client(int newsockfd)
 {
@@ -84,7 +85,7 @@ void handle_client(int newsockfd)
     else if (command == "INFO")
     {
       // if(parsed_msg.msgs[1]=="replication")
-      response = "$11\r\nrole:master\r\n";
+      response = "$" + to_string(role.length() + 5) + "\r\nrole:" + role + "\r\n";
     }
     else
     {
@@ -113,9 +114,24 @@ int main(int argc, char **argv)
         return 1;
       }
       port = atoi(argv[i + 1]);
+      for (i = i + 1; i < argc; i++)
+      {
+        if (strcmp(argv[i], "--replicaof") == 0)
+        {
+          if (i + 1 > argc)
+          {
+            cerr << "Role not provided\n";
+            // return 1;
+          }
+          role = "slave";
+          break;
+        }
+      }
+      break;
     }
   }
-  cout << "Server running on port " << port << "\n";
+
+  cout << "Server running on port " << port << "role" << role << "\n";
   // Flush after every cout / cerr
   cout << unitbuf;
   cerr << unitbuf;
