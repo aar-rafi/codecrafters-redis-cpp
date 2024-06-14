@@ -89,6 +89,10 @@ void handle_client(int newsockfd)
       string s = "\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0";
       response = "$" + to_string(5 + role.length() + s.length()) + "\r\n" + "role:" + role + s + "\r\n";
     }
+    else if (command == "REPLCONF")
+    {
+      response = "+OK\r\n";
+    }
     else
     {
       response = "+PONG\r\n";
@@ -163,7 +167,15 @@ int main(int argc, char **argv)
       cerr << "Failed to connect to master\n";
       return 1;
     }
+    char master_buffer[buff_size];
+    memset(master_buffer, 0, buff_size);
     string sent = "*1\r\n$4\r\nPING\r\n";
+    send(master_fd, sent.c_str(), sent.length(), 0);
+    recv(master_fd, master_buffer, buff_size - 1, 0);
+    sent = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n" + to_string(port) + "\r\n";
+    send(master_fd, sent.c_str(), sent.length(), 0);
+    recv(master_fd, master_buffer, buff_size - 1, 0);
+    sent = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
     send(master_fd, sent.c_str(), sent.length(), 0);
   }
 
