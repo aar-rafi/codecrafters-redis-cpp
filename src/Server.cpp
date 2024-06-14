@@ -22,6 +22,7 @@ unordered_map<string, string> db;
 unordered_map<string, chrono::time_point<chrono::system_clock, chrono::milliseconds>> db_ttl;
 string role = "master";
 bool is_slave = false;
+vector<int> replica_fds;
 
 void handle_client(int newsockfd)
 {
@@ -62,6 +63,11 @@ void handle_client(int newsockfd)
         int ttl = stoi(parsed_msg.msgs[4]);
         db_ttl[parsed_msg.msgs[1]] = chrono::time_point_cast<chrono::milliseconds>(chrono::system_clock::now()) + chrono::milliseconds(ttl);
       }
+      for (int fd : replica_fds)
+      {
+        string s = "*3\r\n$3\r\nSET\r\n$" + to_string(parsed_msg.msgs[1].length()) + "\r\n" + parsed_msg.msgs[1] + "\r\n$" + to_string(parsed_msg.msgs[2].length()) + "\r\n" + parsed_msg.msgs[2] + "\r\n";
+        write(fd, s.c_str(), s.length());
+      }
       response = "+OK\r\n";
     }
     else if (command == "GET")
@@ -99,6 +105,7 @@ void handle_client(int newsockfd)
       write(newsockfd, response.c_str(), response.length());
       const string rdbfile = "\x52\x45\x44\x49\x53\x30\x30\x31\x31\xfa\x09\x72\x65\x64\x69\x73\x2d\x76\x65\x72\x05\x37\x2e\x32\x2e\x30\xfa\x0a\x72\x65\x64\x69\x73\x2d\x62\x69\x74\x73\xc0\x40\xfa\x05\x63\x74\x69\x6d\x65\xc2\x6d\x08\xbc\x65\xfa\x08\x75\x73\x65\x64\x2d\x6d\x65\x6d\xc2\xb0\xc4\x10\x00\xfa\x08\x61\x6f\x66\x2d\x62\x61\x73\x65\xc0\x00\xff\xf0\x6e\x3b\xfe\xc0\xff\x5a\xa2";
       response = "$" + to_string(rdbfile.length()) + "\r\n" + rdbfile;
+      replica_fds.push_back(newsockfd);
     }
     else
     {
