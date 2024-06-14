@@ -97,6 +97,20 @@ void handle_client(int newsockfd)
 
 int main(int argc, char **argv)
 {
+  int port = 6379;
+  for (int i = 1; i < argc; i++)
+  {
+    if (strcmp(argv[i], "--port") == 0)
+    {
+      if (i + 1 > argc)
+      {
+        cerr << "Port number not provided\n";
+        return 1;
+      }
+      port = atoi(argv[i + 1]);
+    }
+  }
+  cout << "Server running on port " << port << "\n";
   // Flush after every cout / cerr
   cout << unitbuf;
   cerr << unitbuf;
@@ -123,7 +137,7 @@ int main(int argc, char **argv)
   struct sockaddr_in server_addr;
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(6379);
+  server_addr.sin_port = htons(port);
 
   if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) != 0)
   {
