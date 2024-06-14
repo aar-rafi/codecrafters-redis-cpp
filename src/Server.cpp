@@ -177,6 +177,9 @@ int main(int argc, char **argv)
     recv(master_fd, master_buffer, buff_size - 1, 0);
     sent = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
     send(master_fd, sent.c_str(), sent.length(), 0);
+    recv(master_fd, master_buffer, buff_size - 1, 0);
+    sent = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
+    send(master_fd, sent.c_str(), sent.length(), 0);
   }
 
   cout << "Server running on port " << port << "role" << role << "\n";
