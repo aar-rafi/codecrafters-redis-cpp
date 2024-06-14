@@ -21,13 +21,14 @@ const int buff_size = 2048;
 unordered_map<string, string> db;
 unordered_map<string, chrono::time_point<chrono::system_clock, chrono::milliseconds>> db_ttl;
 string role = "master";
+bool is_slave = false;
 
 void handle_client(int newsockfd)
 {
   char buffer[buff_size];
   while (1)
   {
-    // memset(buffer, 0, 256);
+    memset(buffer, 0, buff_size);
     int n = read(newsockfd, buffer, buff_size - 1);
     if (n < 0)
     {
@@ -85,8 +86,8 @@ void handle_client(int newsockfd)
     else if (command == "INFO")
     {
       // if(parsed_msg.msgs[1]=="replication")
-      string s = "$" + to_string(role.length() + 5 + 54 + 20 + 4) + "\r\nrole:" + role + "\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0\r\n";
-      response = s;
+      string s = "\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0";
+      response = "$" + to_string(5 + role.length() + s.length()) + "\r\n" + "role:" + role + s + "\r\n";
     }
     else
     {
@@ -103,8 +104,15 @@ void handle_client(int newsockfd)
 }
 
 int main(int argc, char **argv)
-{
+{ // Flush after every cout / cerr
+  cout << unitbuf;
+  cerr << unitbuf;
+  // You can use print statements as follows for debugging, they'll be visible when running tests.
+  cout << "Logs from your program will appear here!\n";
+
   int port = 6379;
+  int master_port = 6379;
+  string master_ip = "127.0.0.1";
   for (int i = 1; i < argc; i++)
   {
     if (strcmp(argv[i], "--port") == 0)
@@ -112,7 +120,6 @@ int main(int argc, char **argv)
       if (i + 1 > argc)
       {
         cerr << "Port number not provided\n";
-        // return 1;
         break;
       }
       port = atoi(argv[i + 1]);
@@ -122,10 +129,16 @@ int main(int argc, char **argv)
         {
           if (i + 1 > argc)
           {
-            cerr << "Role not provided\n";
-            // return 1;
+            cerr << "master ip not provided\n";
           }
           role = "slave";
+          is_slave = true;
+          string temp = argv[i + 1];
+          temp = temp.substr(0, temp.find(" "));
+          master_ip = (temp == "localhost") ? "127.0.0.1" : temp;
+          temp = argv[i + 1];
+          temp = temp.substr(temp.find(" ") + 1);
+          master_port = stoi(temp);
           break;
         }
       }
@@ -133,13 +146,28 @@ int main(int argc, char **argv)
     }
   }
 
-  cout << "Server running on port " << port << "role" << role << "\n";
-  // Flush after every cout / cerr
-  cout << unitbuf;
-  cerr << unitbuf;
+  if (is_slave)
+  {
+    int master_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (master_fd < 0)
+    {
+      cerr << "Failed to create master socket\n";
+      return 1;
+    }
+    struct sockaddr_in master_addr;
+    master_addr.sin_family = AF_INET;
+    master_addr.sin_port = htons(6379);
+    master_addr.sin_addr.s_addr = inet_addr(master_ip.c_str());
+    if (connect(master_fd, (struct sockaddr *)&master_addr, sizeof(master_addr)) < 0)
+    {
+      cerr << "Failed to connect to master\n";
+      return 1;
+    }
+    string sent = "*1\r\n$4\r\nPING\r\n";
+    send(master_fd, sent.c_str(), sent.length(), 0);
+  }
 
-  // You can use print statements as follows for debugging, they'll be visible when running tests.
-  cout << "Logs from your program will appear here!\n";
+  cout << "Server running on port " << port << "role" << role << "\n";
 
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0)
@@ -147,7 +175,6 @@ int main(int argc, char **argv)
     cerr << "Failed to create server socket\n";
     return 1;
   }
-
   // Since the tester restarts your program quite often, setting SO_REUSEADDR
   // ensures that we don't run into 'Address already in use' errors
   int reuse = 1;
