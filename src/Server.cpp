@@ -93,6 +93,10 @@ void handle_client(int newsockfd)
     {
       response = "+OK\r\n";
     }
+    else if (command == "PSYNC")
+    {
+      response = "+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n";
+    }
     else
     {
       response = "+PONG\r\n";
