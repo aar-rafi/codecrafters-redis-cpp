@@ -82,8 +82,8 @@ void handle_client(int newsockfd)
     {
       string key = parsed_msg.msgs[1];
       unique_lock<mutex> lock(mtx);
-      // cv.wait(lock, []
-      //         { return ready; });
+      cv.wait(lock, []
+              { return ready; });
       if (db.find(key) == db.end())
       {
         response = "$-1\r\n";
