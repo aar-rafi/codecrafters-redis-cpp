@@ -99,6 +99,8 @@ void handle_client(int newsockfd)
         string s = db[key];
         response = "$" + to_string(s.length()) + "\r\n" + s + "\r\n";
       }
+      ready = true;
+      cv.notify_one();
     }
     else if (command == "INFO")
     {
@@ -135,13 +137,15 @@ void handle_client(int newsockfd)
 void slave_state_update(RESP parsed_msg)
 {
   {
-    lock_guard<mutex> lock(mtx);
+    unique_lock<mutex> lock(mtx);
+    cv.wait(lock, []
+            { return ready; });
     cout << "slave_state_update: " << parsed_msg.msgs.size() << "\n";
     for (int i = 1; i < parsed_msg.msgs.size(); i = i + 3)
       db[parsed_msg.msgs[i]] = parsed_msg.msgs[i + 1];
-    // ready = true;
+    ready = true;
   }
-  // cv.notify_one();
+  cv.notify_one();
 }
 
 void slave_sync(int port, string master_ip)
