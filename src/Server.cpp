@@ -194,6 +194,7 @@ void slave_sync(int port, string master_ip)
     parsed_msg = parseResp(msbf.erase(0, pos));
     slave_state_update(parsed_msg);
   }
+  memset(master_buffer, 0, buff_size);
   while (recv(master_fd, master_buffer, buff_size - 1, 0) > 0)
   {
     cout << "msbs:  " << master_buffer << endl;
