@@ -82,13 +82,16 @@ void handle_client(int newsockfd)
     {
       string key = parsed_msg.msgs[1];
       unique_lock<mutex> lock(mtx);
+      auto old = chrono::system_clock::now();
       cv.wait(lock, []
               { return ready; });
+      auto newt = chrono::system_clock::now();
+      auto exp = chrono::duration_cast<chrono::milliseconds>(newt - old).count();
       if (db.find(key) == db.end())
       {
         response = "$-1\r\n";
       }
-      else if (db_ttl.find(key) != db_ttl.end() && db_ttl[key] < chrono::time_point_cast<chrono::milliseconds>(chrono::system_clock::now()))
+      else if (db_ttl.find(key) != db_ttl.end() && db_ttl[key] < chrono::time_point_cast<chrono::milliseconds>(chrono::system_clock::now()) - chrono::milliseconds(exp))
       {
         response = "$-1\r\n";
         db.erase(key);
@@ -188,9 +191,9 @@ void slave_sync(int port, string master_ip)
   cout << "msbf:  " << master_buffer << endl;
   string msbf = string(master_buffer);
   size_t pos = msbf.find("*");
-  cout << "pos:  " << pos << endl;
   if (pos != string::npos)
   {
+    cout << "pos:  " << pos << endl;
     parsed_msg = parseResp(msbf.erase(0, pos));
     slave_state_update(parsed_msg);
   }
@@ -254,7 +257,8 @@ int main(int argc, char **argv)
     // slave_sync_thread.detach();
   }
   //
-
+  if (!is_slave)
+    ready = true;
   cout << "Server running on port " << port << "role" << role << "\n";
 
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
