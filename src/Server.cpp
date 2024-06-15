@@ -81,9 +81,9 @@ void handle_client(int newsockfd)
     else if (command == "GET")
     {
       string key = parsed_msg.msgs[1];
-      unique_lock<mutex> lock(mtx);
-      cv.wait(lock, []
-              { return ready; });
+      // unique_lock<mutex> lock(mtx);
+      // cv.wait(lock, []
+      //         { return ready; });
       if (db.find(key) == db.end())
       {
         response = "$-1\r\n";
@@ -137,15 +137,15 @@ void handle_client(int newsockfd)
 void slave_state_update(RESP parsed_msg)
 {
   {
-    lock_guard<mutex> lock(mtx);
+    // lock_guard<mutex> lock(mtx);
     // cv.wait(lock, []
     //         { return ready; });
     cout << "slave_state_update: " << parsed_msg.msgs.size() << "\n";
     for (int i = 1; i < parsed_msg.msgs.size(); i = i + 3)
       db[parsed_msg.msgs[i]] = parsed_msg.msgs[i + 1];
-    ready = true;
+    // ready = true;
   }
-  cv.notify_one();
+  // cv.notify_one();
 }
 
 void slave_sync(int port, string master_ip)
