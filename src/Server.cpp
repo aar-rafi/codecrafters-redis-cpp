@@ -253,7 +253,7 @@ int main(int argc, char **argv)
     // thread slave_sync_thread(slave_sync, port, master_ip);
     // slave_sync_thread.detach();
   }
-  // this_thread::sleep_for(chrono::milliseconds(1000));
+  //
 
   cout << "Server running on port " << port << "role" << role << "\n";
 
@@ -300,6 +300,7 @@ int main(int argc, char **argv)
     // thread thrd(handle_client, newsockfd);
     // thrd.detach();
     threads.emplace_back(handle_client, newsockfd);
+    this_thread::sleep_for(chrono::milliseconds(1000));
   }
 
   close(server_fd);
