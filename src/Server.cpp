@@ -299,7 +299,7 @@ int main(int argc, char **argv)
     cout << "Accepted connection\n";
     // thread thrd(handle_client, newsockfd);
     // thrd.detach();
-    this_thread::sleep_for(chrono::milliseconds(2000));
+    this_thread::sleep_for(chrono::milliseconds(1000));
     threads.emplace_back(handle_client, newsockfd);
   }
 
