@@ -45,17 +45,21 @@ RESP parseResp(string buffer)
 
   case '*':
   {
-    resp.type = ARRAY;
-    int i = buffer.find('\r');
-    resp.count = stoi(buffer.substr(1, i - 1));
-    i += 2;
-    int j = 0;
-    for (int k = 0; k < resp.count; k++)
+    while (buffer.length() > 0)
     {
-      j = buffer.find('\r', i);
-      int len = stoi(buffer.substr(i + 1, j - i - 1)); // i->size
-      resp.msgs.push_back(buffer.substr(j + 2, len));
-      i = j + len + 4;
+      resp.type = ARRAY;
+      int i = buffer.find('\r');
+      resp.count = stoi(buffer.substr(1, i - 1));
+      i += 2;
+      int j = 0, len = 0;
+      for (int k = 0; k < resp.count; k++)
+      {
+        j = buffer.find('\r', i);                    // i at $
+        len = stoi(buffer.substr(i + 1, j - i - 1)); // i->legth of str just before $ so j-(i+1) as have to delete the $ also
+        resp.msgs.push_back(buffer.substr(j + 2, len));
+        i = j + len + 4;
+      }
+      buffer.erase(0, i);
     }
   }
   break;

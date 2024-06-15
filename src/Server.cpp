@@ -14,6 +14,8 @@
 #include <thread>
 #include "RESPparser.hpp"
 #include <unordered_map>
+#include <mutex>
+#include <condition_variable>
 
 using namespace std;
 
@@ -23,6 +25,9 @@ unordered_map<string, chrono::time_point<chrono::system_clock, chrono::milliseco
 string role = "master";
 bool is_slave = false;
 vector<int> replica_fds;
+mutex mtx;
+condition_variable cv;
+bool ready = false;
 
 void handle_client(int newsockfd)
 {
@@ -63,16 +68,22 @@ void handle_client(int newsockfd)
         int ttl = stoi(parsed_msg.msgs[4]);
         db_ttl[parsed_msg.msgs[1]] = chrono::time_point_cast<chrono::milliseconds>(chrono::system_clock::now()) + chrono::milliseconds(ttl);
       }
-      for (int fd : replica_fds)
+      if (!is_slave)
       {
-        string s = "*3\r\n$3\r\nSET\r\n$" + to_string(parsed_msg.msgs[1].length()) + "\r\n" + parsed_msg.msgs[1] + "\r\n$" + to_string(parsed_msg.msgs[2].length()) + "\r\n" + parsed_msg.msgs[2] + "\r\n";
-        write(fd, s.c_str(), s.length());
+        for (int fd : replica_fds)
+        {
+          string s = "*3\r\n$3\r\nSET\r\n$" + to_string(parsed_msg.msgs[1].length()) + "\r\n" + parsed_msg.msgs[1] + "\r\n$" + to_string(parsed_msg.msgs[2].length()) + "\r\n" + parsed_msg.msgs[2] + "\r\n";
+          write(fd, s.c_str(), s.length());
+        }
       }
       response = "+OK\r\n";
     }
     else if (command == "GET")
     {
       string key = parsed_msg.msgs[1];
+      unique_lock<mutex> lock(mtx);
+      // cv.wait(lock, []
+      //         { return ready; });
       if (db.find(key) == db.end())
       {
         response = "$-1\r\n";
@@ -121,12 +132,79 @@ void handle_client(int newsockfd)
   }
 }
 
+void slave_state_update(RESP parsed_msg)
+{
+  {
+    lock_guard<mutex> lock(mtx);
+    // cout << "slave_state_update: " << parsed_msg.msgs.size() << "\n";
+    for (int i = 1; i < parsed_msg.msgs.size(); i = i + 3)
+      db[parsed_msg.msgs[i]] = parsed_msg.msgs[i + 1];
+    // ready = true;
+  }
+  // cv.notify_one();
+}
+
+void slave_sync(int port, string master_ip)
+{
+  RESP parsed_msg;
+  int master_fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (master_fd < 0)
+  {
+    cerr << "Failed to create master socket\n";
+    return;
+  }
+  struct sockaddr_in master_addr;
+  master_addr.sin_family = AF_INET;
+  master_addr.sin_port = htons(6379);
+  master_addr.sin_addr.s_addr = inet_addr(master_ip.c_str());
+  if (connect(master_fd, (struct sockaddr *)&master_addr, sizeof(master_addr)) < 0)
+  {
+    cerr << "Failed to connect to master\n";
+    return;
+  }
+
+  char master_buffer[buff_size];
+  memset(master_buffer, 0, buff_size);
+
+  string sent = "*1\r\n$4\r\nPING\r\n";
+  send(master_fd, sent.c_str(), sent.length(), 0);
+  recv(master_fd, master_buffer, buff_size - 1, 0);
+  sent = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n" + to_string(port) + "\r\n";
+  send(master_fd, sent.c_str(), sent.length(), 0);
+  recv(master_fd, master_buffer, buff_size - 1, 0);
+  sent = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
+  send(master_fd, sent.c_str(), sent.length(), 0);
+  recv(master_fd, master_buffer, buff_size - 1, 0);
+  sent = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
+  send(master_fd, sent.c_str(), sent.length(), 0);
+  recv(master_fd, master_buffer, buff_size - 1, 0);
+  // cout << "msb:  " << master_buffer << endl;
+  memset(master_buffer, 0, buff_size);
+  recv(master_fd, master_buffer, buff_size - 1, 0);
+  // cout << "msbf:  " << master_buffer << endl;
+  string msbf = string(master_buffer);
+  size_t pos = msbf.find("*");
+  // cout << "pos:  " << pos << endl;
+  if (pos != string::npos)
+  {
+    parsed_msg = parseResp(msbf.erase(0, pos));
+    slave_state_update(parsed_msg);
+  }
+  while (recv(master_fd, master_buffer, buff_size - 1, 0) > 0)
+  {
+    // cout << "msbs:  " << master_buffer << endl;
+    parsed_msg = parseResp(string(master_buffer));
+    slave_state_update(parsed_msg);
+  }
+}
+
 int main(int argc, char **argv)
 { // Flush after every cout / cerr
   cout << unitbuf;
   cerr << unitbuf;
   // You can use print statements as follows for debugging, they'll be visible when running tests.
   cout << "Logs from your program will appear here!\n";
+  vector<thread> threads;
 
   int port = 6379;
   int master_port = 6379;
@@ -166,35 +244,11 @@ int main(int argc, char **argv)
 
   if (is_slave)
   {
-    int master_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (master_fd < 0)
-    {
-      cerr << "Failed to create master socket\n";
-      return 1;
-    }
-    struct sockaddr_in master_addr;
-    master_addr.sin_family = AF_INET;
-    master_addr.sin_port = htons(6379);
-    master_addr.sin_addr.s_addr = inet_addr(master_ip.c_str());
-    if (connect(master_fd, (struct sockaddr *)&master_addr, sizeof(master_addr)) < 0)
-    {
-      cerr << "Failed to connect to master\n";
-      return 1;
-    }
-    char master_buffer[buff_size];
-    memset(master_buffer, 0, buff_size);
-    string sent = "*1\r\n$4\r\nPING\r\n";
-    send(master_fd, sent.c_str(), sent.length(), 0);
-    recv(master_fd, master_buffer, buff_size - 1, 0);
-    sent = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n" + to_string(port) + "\r\n";
-    send(master_fd, sent.c_str(), sent.length(), 0);
-    recv(master_fd, master_buffer, buff_size - 1, 0);
-    sent = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
-    send(master_fd, sent.c_str(), sent.length(), 0);
-    recv(master_fd, master_buffer, buff_size - 1, 0);
-    sent = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
-    send(master_fd, sent.c_str(), sent.length(), 0);
+    threads.emplace_back(slave_sync, port, master_ip);
+    // thread slave_sync_thread(slave_sync, port, master_ip);
+    // slave_sync_thread.detach();
   }
+  // this_thread::sleep_for(chrono::milliseconds(1000));
 
   cout << "Server running on port " << port << "role" << role << "\n";
 
@@ -238,8 +292,9 @@ int main(int argc, char **argv)
   {
     int newsockfd = accept(server_fd, (struct sockaddr *)&client_addr, (socklen_t *)&client_addr_len);
     cout << "Accepted connection\n";
-    thread thrd(handle_client, newsockfd);
-    thrd.detach();
+    // thread thrd(handle_client, newsockfd);
+    // thrd.detach();
+    threads.emplace_back(handle_client, newsockfd);
   }
 
   close(server_fd);
