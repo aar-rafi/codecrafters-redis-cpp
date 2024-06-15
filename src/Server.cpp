@@ -183,9 +183,9 @@ void slave_sync(int port, string master_ip)
   send(master_fd, sent.c_str(), sent.length(), 0);
   recv(master_fd, master_buffer, buff_size - 1, 0);
   // cout << "msb:  " << master_buffer << endl;
-  memset(master_buffer, 0, buff_size);
+  // memset(master_buffer, 0, buff_size);
   recv(master_fd, master_buffer, buff_size - 1, 0);
-  // cout << "msbf:  " << master_buffer << endl;
+  cout << "msbf:  " << master_buffer << endl;
   string msbf = string(master_buffer);
   size_t pos = msbf.find("*");
   cout << "pos:  " << pos << endl;
@@ -197,7 +197,7 @@ void slave_sync(int port, string master_ip)
   memset(master_buffer, 0, buff_size);
   while (recv(master_fd, master_buffer, buff_size - 1, 0) > 0)
   {
-    cout << "msbs:  " << master_buffer << endl;
+    // cout << "msbs:  " << master_buffer << endl;
     parsed_msg = parseResp(string(master_buffer));
     slave_state_update(parsed_msg);
   }
