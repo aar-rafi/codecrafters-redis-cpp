@@ -136,7 +136,7 @@ void slave_state_update(RESP parsed_msg)
 {
   {
     lock_guard<mutex> lock(mtx);
-    // cout << "slave_state_update: " << parsed_msg.msgs.size() << "\n";
+    cout << "slave_state_update: " << parsed_msg.msgs.size() << "\n";
     for (int i = 1; i < parsed_msg.msgs.size(); i = i + 3)
       db[parsed_msg.msgs[i]] = parsed_msg.msgs[i + 1];
     // ready = true;
@@ -184,7 +184,7 @@ void slave_sync(int port, string master_ip)
   // cout << "msbf:  " << master_buffer << endl;
   string msbf = string(master_buffer);
   size_t pos = msbf.find("*");
-  // cout << "pos:  " << pos << endl;
+  cout << "pos:  " << pos << endl;
   if (pos != string::npos)
   {
     parsed_msg = parseResp(msbf.erase(0, pos));
@@ -192,7 +192,7 @@ void slave_sync(int port, string master_ip)
   }
   while (recv(master_fd, master_buffer, buff_size - 1, 0) > 0)
   {
-    // cout << "msbs:  " << master_buffer << endl;
+    cout << "msbs:  " << master_buffer << endl;
     parsed_msg = parseResp(string(master_buffer));
     slave_state_update(parsed_msg);
   }
