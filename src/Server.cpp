@@ -300,7 +300,7 @@ int main(int argc, char **argv)
     // thread thrd(handle_client, newsockfd);
     // thrd.detach();
     threads.emplace_back(handle_client, newsockfd);
-    this_thread::sleep_for(chrono::milliseconds(1000));
+    this_thread::sleep_for(chrono::milliseconds(2000));
   }
 
   close(server_fd);
